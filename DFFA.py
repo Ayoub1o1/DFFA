@@ -1,96 +1,85 @@
 import requests
-import json
+from typing import Any, Optional
+
+# Custom exceptions for clean control flow in recursive menus
+class RestartNavigation(Exception):
+    pass
+
+class QuitNavigation(Exception):
+    pass
 
 class DFFA:
     
-    def __init__(self , baseurl , endpoint):
-        self.baseurl = baseurl
-        self.endpoint = endpoint
-
-
-    def get_request(self, baseurl, endpoint):
+    def get_request(self) -> Optional[Any]:
+        """Prompts user for URL, fetches data, and handles network exceptions securely."""
+        url = input("Enter the API URL: ").strip()
+        if not url:
+            return None
+            
         try:
-            response = requests.get(baseurl + endpoint)
+            # timeout prevents hanging on unresponsive servers (security/efficiency)
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()  # Automatically handles 4xx/5xx errors
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Network/HTTP Error: {e}")
+        except ValueError:
+            print("Error: Response is not valid JSON.")
+        return None
 
-            if response.status_code != 200 :
-                raise requests.ConnectionError("can't reach the API url.")
-            else :
-                return response.json()
-        except requests.ConnectionError as e :
-            print(f'Error {e}')
-        except requests.JSONDecodeError as e:
-            print(f'Error {e}')
+    def parse_content(self, data: Any, path: str = 'root') -> None:
+        """Recursively parses JSON data with an interactive CLI navigation system."""
+        while True:
+            # 1. Check if item has content
+            if data is None or data == [] or data == {}:
+                print(f"\n{path} has no content.")
+                if input('Press "back"/Enter to return, "quit" to exit: ').strip().lower() == 'quit':
+                    raise QuitNavigation
+                break
 
-    def parse_json(self , response , path = 'root'):
-        # check if the item had content 
+            # 2. Dictionary Case
+            if isinstance(data, dict):
+                keys = list(data.keys())
+                print("\nAvailable items:")
+                for i, k in enumerate(keys):
+                    print(f"{i} : {k}")
+                
+                choice = input('\nChoose item (or "back"/"quit"): ').strip().lower()
+                if choice == 'quit': raise QuitNavigation
+                if choice == 'back': break
+                
+                try:
+                    key = keys[int(choice)]
+                    self.parse_content(data[key], f"{path}.{key}")
+                except (ValueError, IndexError):
+                    print("Invalid choice!")
 
-        if response is None or response == [] or response == {}:
-            print(f"\n{path} has no content")
-            return 
+            # 3. List Case
+            elif isinstance(data, list):
+                print("\nAvailable items:")
+                for i, v in enumerate(data):
+                    print(f"{i} : {type(v).__name__}")
+                
+                choice = input('\nChoose item (or "back"/"quit"): ').strip().lower()
+                if choice == 'quit': raise QuitNavigation
+                if choice == 'back': break
+                
+                try:
+                    idx = int(choice)
+                    self.parse_content(data[idx], f"{path}[{idx}]")
+                except (ValueError, IndexError):
+                    print("Invalid choice!")
 
-        # dic case
-        if isinstance(response , dict):
-            keys = list(response.keys())
-            print("\nAvailable items:")
-
-            for index, key in enumerate(keys):
-                print(f'{index} : {key}')
-
-            choice =  input('\nchoose the item (or quit):')
-
-            if choice.lower() == 'quit':
-                print('bye')
-                return
-            
-            try :
-                choice = int(choice)
-                selected_key = keys[choice]
-
-                self.parse_json(
-                    response[selected_key],
-                    path + '.' + selected_key
-                )
-            except (ValueError , IndexError):
-                print('Invalid choice!')
-        
-        # list case
-
-        elif isinstance(response , list):
-
-            print('\nAvailiable items:')
-
-            for index, key in enumerate(response):
-                print(f'{index} : {type(key).__name__}')
-
-            choice = input('\nChoose item (or quit):')
-
-            if choice.lower() == 'quit':
-                print('Bye!')
-                return
-            
-            try : 
-                choice = int(choice)
-
-                self.parse_json(
-                    response[choice],
-                    path + f'[{choice}]'
-                )
-            except (ValueError , IndexError):
-                print('Invalid choice')
-
-        else:
-            print('\nFinal Value:')
-            print(response)
+            # 4. Final Value Case
+            else:
+                print(f"\nFinal Value at {path}:\n{data}")
+                action = input('\nPress Enter to restart from zero, "back" to return, "quit" to exit: ').strip().lower()
+                
+                if action == 'quit':
+                    raise QuitNavigation
+                elif action == 'back':
+                    break
+                elif action == '':
+                    raise RestartNavigation
 
 
-
-baseurl = "https://dragonball-api.com/api/"
-endpoint = "characters"
-
-baseurl2 = "https://rickandmortyapi.com/api/"
-endpoint2 = "character"
-
-data = DFFA(baseurl  , endpoint)
-
-response = data.get_request(baseurl2 , endpoint2)
-data.parse_json(response)
