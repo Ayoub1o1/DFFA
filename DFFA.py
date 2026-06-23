@@ -1,7 +1,6 @@
 import requests
 from typing import Any, Optional
 
-# Custom exceptions for clean control flow in recursive menus
 class RestartNavigation(Exception):
     pass
 
@@ -10,16 +9,15 @@ class QuitNavigation(Exception):
 
 class DFFA:
     
-    def get_request(self) -> Optional[Any]:
-        """Prompts user for URL, fetches data, and handles network exceptions securely."""
+    def get_request(self):
+
         url = input("Enter the API URL: ").strip()
         if not url:
             return None
             
         try:
-            # timeout prevents hanging on unresponsive servers (security/efficiency)
             response = requests.get(url, timeout=10)
-            response.raise_for_status()  # Automatically handles 4xx/5xx errors
+            response.raise_for_status() 
             return response.json()
         except requests.exceptions.RequestException as e:
             print(f"Network/HTTP Error: {e}")
@@ -27,8 +25,7 @@ class DFFA:
             print("Error: Response is not valid JSON.")
         return None
 
-    def parse_content(self, data: Any, path: str = 'root') -> None:
-        """Recursively parses JSON data with an interactive CLI navigation system."""
+    def parse_content(self, data: Any, path: str = 'root'):
         while True:
             # 1. Check if item has content
             if data is None or data == [] or data == {}:

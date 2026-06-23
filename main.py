@@ -14,9 +14,9 @@ if __name__ == "__main__":
             while True:
                 try:
                     dffa.parse_content(data)
-                    break # Exits normally if user hits "back" at the root level
+                    break 
                 except RestartNavigation:
-                    # Clears the screen/loop and restarts from the root data
+                    
                     print("\n--- Restarting from Root ---")
                     continue
                     
